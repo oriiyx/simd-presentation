@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SIMD XOR Benchmark Results</title>
+    <style>
+        :root {
+            --bg: #1a1a1a;
+            --bg2: #2a2a2a;
+            --text: #e0e0e0;
+            --text2: #a0a0a0;
+            --text3: #707070;
+            --radius: 8px;
+        }
+        @media (prefers-color-scheme: light) {
+            :root {
+                --bg: #ffffff;
+                --bg2: #f3f3f3;
+                --text: #1a1a1a;
+                --text2: #555555;
+                --text3: #888888;
+            }
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            padding: 2rem;
+        }
+        h2 { font-size: 1.25rem; font-weight: 600; margin-bottom: 1.5rem; }
+        .cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 1.5rem; }
+        .card { background: var(--bg2); border-radius: var(--radius); padding: 1rem; }
+        .card-label { font-size: 13px; color: var(--text2); }
+        .card-value { font-size: 24px; font-weight: 500; margin: 4px 0; }
+        .card-sub { font-size: 12px; color: var(--text3); }
+        .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-bottom: 8px; font-size: 12px; color: var(--text2); }
+        .legend span { display: flex; align-items: center; gap: 4px; }
+        .swatch { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+        .chart-wrap { position: relative; width: 100%; height: 340px; }
+        .chart-wrap.short { height: 300px; }
+        .section { margin-top: 2rem; }
+    </style>
+</head>
+<body>
+
+<h2>Benchmark: Scalar vs SIMD XOR Cipher Throughput</h2>
+
+<div class="cards">
+    <div class="card">
+        <div class="card-label">Best speedup (SIMD 256)</div>
+        <div class="card-value">~13x</div>
+        <div class="card-sub">at 256B payload</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Best speedup (unrolled)</div>
+        <div class="card-value">~16x</div>
+        <div class="card-sub">at 4KB payload</div>
+    </div>
+    <div class="card">
+        <div class="card-label">Peak throughput</div>
+        <div class="card-value">19.5 GB/s</div>
+        <div class="card-sub">unrolled @ 16MB</div>
+    </div>
+</div>
+
+<div class="legend">
+    <span><span class="swatch" style="background:#73726c"></span>Scalar (byte loop)</span>
+    <span><span class="swatch" style="background:#3266ad"></span>SIMD 256-bit</span>
+    <span><span class="swatch" style="background:#1D9E75"></span>SIMD 256 unrolled</span>
+</div>
+<div class="chart-wrap">
+    <canvas id="throughputChart"></canvas>
+</div>
+
+<div class="section">
+    <div class="legend">
+        <span><span class="swatch" style="background:#73726c"></span>Scalar</span>
+        <span><span class="swatch" style="background:#3266ad"></span>SIMD 256</span>
+        <span><span class="swatch" style="background:#1D9E75"></span>SIMD unrolled</span>
+    </div>
+    <div class="chart-wrap short">
+        <canvas id="latencyChart"></canvas>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+    const labels = ['256B', '4KB', '64KB', '1MB', '16MB'];
+    const scalar_tp = [1378, 1401, 1389, 1365, 1360];
+    const simd_tp   = [17715, 16888, 15694, 14386, 14098];
+    const unroll_tp = [19197, 22189, 20827, 19027, 19179];
+
+    const scalar_ns = [187, 2923, 47541, 768299, 12335238];
+    const simd_ns   = [14.45, 243, 4192, 72820, 1185801];
+    const unroll_ns = [13.34, 184.6, 3153, 55111, 874947];
+
+    const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+    const gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    const tickColor = isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)';
+
+    new Chart(document.getElementById('throughputChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Scalar',        data: scalar_tp, backgroundColor: '#73726c' },
+                { label: 'SIMD 256',      data: simd_tp,   backgroundColor: '#3266ad' },
+                { label: 'SIMD unrolled', data: unroll_tp,  backgroundColor: '#1D9E75' }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Throughput (MB/s) \u2014 higher is better',
+                    color: tickColor,
+                    font: { size: 13, weight: '400' }
+                }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: tickColor } },
+                y: {
+                    grid: { color: gridColor },
+                    ticks: { color: tickColor, callback: v => v >= 1000 ? Math.round(v / 1000) + 'K' : v }
+                }
+            }
+        }
+    });
+
+    new Chart(document.getElementById('latencyChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Scalar',        data: scalar_ns, backgroundColor: '#73726c' },
+                { label: 'SIMD 256',      data: simd_ns,   backgroundColor: '#3266ad' },
+                { label: 'SIMD unrolled', data: unroll_ns,  backgroundColor: '#1D9E75' }
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false },
+                title: {
+                    display: true,
+                    text: 'Latency (ns/op) \u2014 lower is better, log scale',
+                    color: tickColor,
+                    font: { size: 13, weight: '400' }
+                }
+            },
+            scales: {
+                x: { grid: { display: false }, ticks: { color: tickColor } },
+                y: {
+                    type: 'logarithmic',
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: tickColor,
+                        callback: v => {
+                            if (v >= 1000000) return Math.round(v / 1000000) + 'ms';
+                            if (v >= 1000) return Math.round(v / 1000) + '\u00b5s';
+                            return Math.round(v) + 'ns';
+                        }
+                    }
+                }
+            }
+        }
+    });
+</script>
+</body>
+</html>
