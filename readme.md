@@ -31,7 +31,10 @@ VPXOR has 1-cycle latency and can retire 3 per cycle on ports p0/p1/p5.
 
 For the presentation, show the Emerald Rapids measurements for:
 
-- **VPXOR (YMM, YMM, YMM)** — the instruction behind `Uint8x32.Xor()`
+![vpxor_emerald_rapids.png](vpxor_emerald_rapids.png)
+
+- **VPXOR (YMM, YMM, YMM)** — the instruction behind
+  `Uint8x32.Xor()` - [link](https://uops.info/html-instr/VPXOR_YMM_YMM_M256.html#EMR)
 - **VAESENC (XMM, XMM, XMM)** — hardware AES round (for context on crypto acceleration)
 
 Filter: select "Emerald Rapids" architecture, then filter by "AES" or "AVX2" extension.
