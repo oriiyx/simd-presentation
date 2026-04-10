@@ -39,28 +39,28 @@ func BenchmarkXOR(b *testing.B) {
 	for _, size := range sizes {
 		plaintext := generateRandomBytes(size)
 		keystream := generateRandomBytes(size)
-		dst := make([]byte, size)
+		destination := make([]byte, size)
 
 		label := formatSize(size)
 
 		b.Run(fmt.Sprintf("Scalar/%s", label), func(b *testing.B) {
 			b.SetBytes(int64(size))
 			for b.Loop() {
-				xorcipher.XORScalar(dst, plaintext, keystream)
+				xorcipher.XORScalar(destination, plaintext, keystream)
 			}
 		})
 
 		b.Run(fmt.Sprintf("SIMD256/%s", label), func(b *testing.B) {
 			b.SetBytes(int64(size))
 			for b.Loop() {
-				xorcipher.XORSimd256(dst, plaintext, keystream)
+				xorcipher.XORSimd256(destination, plaintext, keystream)
 			}
 		})
 
 		b.Run(fmt.Sprintf("SIMD256_Unrolled/%s", label), func(b *testing.B) {
 			b.SetBytes(int64(size))
 			for b.Loop() {
-				xorcipher.XORSimd256Unrolled(dst, plaintext, keystream)
+				xorcipher.XORSimd256Unrolled(destination, plaintext, keystream)
 			}
 		})
 	}

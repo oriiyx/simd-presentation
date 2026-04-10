@@ -13,9 +13,9 @@ import (
 
 // XORScalar applies a repeating keystream over plaintext, one byte at a time.
 // This is how a naive Go implementation would look.
-func XORScalar(dst, plaintext, keystream []byte) {
+func XORScalar(destination, plaintext, keystream []byte) {
 	for i := range plaintext {
-		dst[i] = plaintext[i] ^ keystream[i]
+		destination[i] = plaintext[i] ^ keystream[i]
 	}
 }
 
@@ -28,7 +28,7 @@ func XORScalar(dst, plaintext, keystream []byte) {
 //   - Ports: p0, p1, p5
 //
 // This means the CPU can XOR 96 bytes per clock cycle with 256-bit vectors.
-func XORSimd256(dst, plaintext, keystream []byte) {
+func XORSimd256(destination, plaintext, keystream []byte) {
 	n := len(plaintext)
 	i := 0
 
@@ -37,13 +37,17 @@ func XORSimd256(dst, plaintext, keystream []byte) {
 		p := archsimd.LoadUint8x32((*[32]byte)(plaintext[i : i+32]))
 		k := archsimd.LoadUint8x32((*[32]byte)(keystream[i : i+32]))
 		r := p.Xor(k)
-		r.Store((*[32]byte)(dst[i : i+32]))
+
+		// r holds the XOR result in a SIMD register (a CPU vector register, not memory).
+		// .Store() writes those 32 bytes from the register back into the destination slice in main memory.
+		// Without it, the result would just be discarded when the register gets reused.
+		r.Store((*[32]byte)(destination[i : i+32]))
 		i += 32
 	}
 
 	// Handle remaining bytes (< 32) with scalar fallback
 	for ; i < n; i++ {
-		dst[i] = plaintext[i] ^ keystream[i]
+		destination[i] = plaintext[i] ^ keystream[i]
 	}
 }
 
@@ -51,7 +55,7 @@ func XORSimd256(dst, plaintext, keystream []byte) {
 // keeping the SIMD pipeline fully saturated.
 // This demonstrates how manual unrolling can help the CPU's out-of-order
 // engine overlap loads, XORs, and stores.
-func XORSimd256Unrolled(dst, plaintext, keystream []byte) {
+func XORSimd256Unrolled(destination, plaintext, keystream []byte) {
 	n := len(plaintext)
 	i := 0
 
@@ -72,10 +76,10 @@ func XORSimd256Unrolled(dst, plaintext, keystream []byte) {
 		r2 := p2.Xor(k2)
 		r3 := p3.Xor(k3)
 
-		r0.Store((*[32]byte)(dst[i : i+32]))
-		r1.Store((*[32]byte)(dst[i+32 : i+64]))
-		r2.Store((*[32]byte)(dst[i+64 : i+96]))
-		r3.Store((*[32]byte)(dst[i+96 : i+128]))
+		r0.Store((*[32]byte)(destination[i : i+32]))
+		r1.Store((*[32]byte)(destination[i+32 : i+64]))
+		r2.Store((*[32]byte)(destination[i+64 : i+96]))
+		r3.Store((*[32]byte)(destination[i+96 : i+128]))
 
 		i += 128
 	}
@@ -85,12 +89,12 @@ func XORSimd256Unrolled(dst, plaintext, keystream []byte) {
 		p := archsimd.LoadUint8x32((*[32]byte)(plaintext[i : i+32]))
 		k := archsimd.LoadUint8x32((*[32]byte)(keystream[i : i+32]))
 		r := p.Xor(k)
-		r.Store((*[32]byte)(dst[i : i+32]))
+		r.Store((*[32]byte)(destination[i : i+32]))
 		i += 32
 	}
 
 	// Scalar tail
 	for ; i < n; i++ {
-		dst[i] = plaintext[i] ^ keystream[i]
+		destination[i] = plaintext[i] ^ keystream[i]
 	}
 }
